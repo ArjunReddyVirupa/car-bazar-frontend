@@ -15,7 +15,7 @@ import { api } from "@/src/lib/api";
 import { Button } from "@/src/components/ui/Button";
 import type { Enquiry } from "@/src/types";
 export default function Dashboard() {
-  const { cars, loadCars, removeCar, updateStatus } = useStore();
+  const { cars, loadCars, updateStatus, deleteCar } = useStore();
   const [stats, setStats] = useState({
     totalCars: 0,
     availableCars: 0,
@@ -39,9 +39,10 @@ export default function Dashboard() {
       return;
     setBusy(id);
     try {
-      await api.deleteCar(id);
       const target = cars.find((c) => c.id === id);
-      removeCar(id);
+
+      await deleteCar(id);
+
       setStats((s) => ({
         ...s,
         totalCars: Math.max(0, s.totalCars - 1),

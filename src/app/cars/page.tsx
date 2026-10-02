@@ -24,7 +24,7 @@ export default function CarsPage() {
   const [mobileFilter, setMobileFilter] = useState(false);
 
   useEffect(() => {
-    void loadCars();
+    void loadCars(true);
   }, [loadCars]);
 
   const brands = useMemo(

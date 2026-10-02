@@ -21,6 +21,7 @@ interface Store {
   createCar: (body: Partial<Car>) => Promise<Car>;
   updateCar: (id: string, body: Partial<Car>) => Promise<Car>;
   updateStatus: (id: string, status: CarStatus) => Promise<Car>;
+  deleteCar: (id: string) => Promise<void>;
   uploadImages: (id: string, files: File[]) => Promise<Car>;
   deleteImage: (carId: string, imageId: string) => Promise<void>;
   resetError: () => void;
@@ -100,6 +101,10 @@ export const useStore = create<Store>()(
         const { data } = await api.uploadImages(id, files);
         get().upsertCar(data);
         return data;
+      },
+      deleteCar: async (id) => {
+        await api.deleteCar(id);
+        get().removeCar(id);
       },
       deleteImage: async (carId, imageId) => {
         await api.deleteImage(carId, imageId);
