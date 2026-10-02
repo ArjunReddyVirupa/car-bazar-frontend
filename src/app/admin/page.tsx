@@ -10,10 +10,10 @@ import {
   RefreshCw,
   Trash2,
 } from "lucide-react";
-import { useStore } from "@/store/useStore";
-import { api } from "@/lib/api";
-import { Button } from "@/components/ui/Button";
-import type { Enquiry } from "@/types";
+import { useStore } from "@/src/store/useStore";
+import { api } from "@/src/lib/api";
+import { Button } from "@/src/components/ui/Button";
+import type { Enquiry } from "@/src/types";
 export default function Dashboard() {
   const { cars, loadCars, removeCar, updateStatus } = useStore();
   const [stats, setStats] = useState({

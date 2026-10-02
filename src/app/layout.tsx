@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Header } from "@/components/layout/Header";
+import { Header } from "@/src/components/layout/Header";
 
 export const metadata: Metadata = {
   title: "Car Bazar | Quality Used Cars",
@@ -13,7 +13,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" data-scroll-behavior="smooth">
       <body>
         <Header />
         {children}

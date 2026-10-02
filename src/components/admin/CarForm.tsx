@@ -12,12 +12,12 @@ import {
 import { useRouter } from "next/navigation";
 import { ImagePlus, Save, Upload, X, Loader2, AlertCircle } from "lucide-react";
 
-import { useStore } from "@/store/useStore";
-import { Button } from "@/components/ui/Button";
-import { Field, Input, Select, Textarea } from "@/components/ui/Input";
-import type { Car } from "@/types";
-import { api } from "@/lib/api";
-import type { VehicleCatalogItem } from "@/lib/api";
+import { useStore } from "@/src/store/useStore";
+import { Button } from "@/src/components/ui/Button";
+import { Field, Input, Select, Textarea } from "@/src/components/ui/Input";
+import type { Car } from "@/src/types";
+import { api } from "@/src/lib/api";
+import type { VehicleCatalogItem } from "@/src/lib/api";
 
 const MAX_PHOTOS = 20;
 const MAX_FILE_SIZE_MB = 10;

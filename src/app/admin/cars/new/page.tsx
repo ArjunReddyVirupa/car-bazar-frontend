@@ -1,4 +1,4 @@
-import { CarForm } from "@/components/admin/CarForm";
+import { CarForm } from "@/src/components/admin/CarForm";
 export default function NewCar() {
   return (
     <div className="mx-auto max-w-6xl">

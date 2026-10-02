@@ -10,11 +10,11 @@ import {
   ImageIcon,
 } from "lucide-react";
 
-import { api } from "@/lib/api";
-import type { Car, Document, DocumentType } from "@/types";
-import { CarForm } from "@/components/admin/CarForm";
-import { Button } from "@/components/ui/Button";
-import { Field, Input, Select, Textarea } from "@/components/ui/Input";
+import { api } from "@/src/lib/api";
+import type { Car, Document, DocumentType } from "@/src/types";
+import { CarForm } from "@/src/components/admin/CarForm";
+import { Button } from "@/src/components/ui/Button";
+import { Field, Input, Select, Textarea } from "@/src/components/ui/Input";
 
 type PageProps = {
   params: Promise<{

@@ -1,8 +1,8 @@
 "use client";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { api, ApiError } from "@/lib/api";
-import type { Car, CarStatus, User } from "@/types";
+import { api, ApiError } from "@/src/lib/api";
+import type { Car, CarStatus, User } from "@/src/types";
 
 interface Store {
   cars: Car[];

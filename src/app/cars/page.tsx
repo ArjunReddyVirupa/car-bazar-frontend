@@ -1,10 +1,10 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { Filter, Search, SlidersHorizontal, X } from "lucide-react";
-import { CarCard } from "@/components/cars/CarCard";
-import { Select, Input } from "@/components/ui/Input";
-import { useStore } from "@/store/useStore";
-import type { FuelType, Transmission } from "@/types";
+import { CarCard } from "@/src/components/cars/CarCard";
+import { Select, Input } from "@/src/components/ui/Input";
+import { useStore } from "@/src/store/useStore";
+import type { FuelType, Transmission } from "@/src/types";
 const fuels: [FuelType, string][] = [
   ["PETROL", "Petrol"],
   ["DIESEL", "Diesel"],

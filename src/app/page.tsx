@@ -12,8 +12,8 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useStore } from "@/store/useStore";
-import { CarCard } from "@/components/cars/CarCard";
+import { useStore } from "@/src/store/useStore";
+import { CarCard } from "@/src/components/cars/CarCard";
 
 type Feature = {
   icon: typeof ShieldCheck;

@@ -8,11 +8,11 @@ import {
   //   UploadCloud,
   ImageIcon,
 } from "lucide-react";
-import { api } from "@/lib/api";
-import type { Car, Document, DocumentType } from "@/types";
-import { CarForm } from "@/components/admin/CarForm";
+import { api } from "@/src/lib/api";
+import type { Car, Document, DocumentType } from "@/src/types";
+import { CarForm } from "@/src/components/admin/CarForm";
 // import { Button } from "@/components/ui/Button";
-import { Field, Input, Select, Textarea } from "@/components/ui/Input";
+import { Field, Input, Select, Textarea } from "@/src/components/ui/Input";
 export default function EditCar({
   params,
 }: {

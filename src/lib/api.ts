@@ -39,11 +39,11 @@ export const api = {
   getCars: (params: URLSearchParams = new URLSearchParams()) =>
     request<{
       success: true;
-      data: import("@/types").Car[];
-      meta: import("@/types").Paginated<import("@/types").Car>["meta"];
+      data: import("@/src/types").Car[];
+      meta: import("@/src/types").Paginated<import("@/src/types").Car>["meta"];
     }>(`/cars?${params}`),
   getCar: (id: string) =>
-    request<{ success: true; data: import("@/types").Car }>(`/cars/${id}`),
+    request<{ success: true; data: import("@/src/types").Car }>(`/cars/${id}`),
   getVehicleBrands: () =>
     request<{
       success: true;
@@ -62,33 +62,33 @@ export const api = {
       data: VehicleCatalogItem[];
     }>(`/vehicle-catalog/models/${modelId}/variants`),
   login: (email: string, password: string) =>
-    request<{ success: true; data: { user: import("@/types").User } }>(
+    request<{ success: true; data: { user: import("@/src/types").User } }>(
       "/auth/login",
       { method: "POST", body: JSON.stringify({ email, password }) }
     ),
   me: () =>
-    request<{ success: true; data: import("@/types").User }>("/auth/me"),
+    request<{ success: true; data: import("@/src/types").User }>("/auth/me"),
   logout: () => request<{ success: true }>("/auth/logout", { method: "POST" }),
-  createCar: (body: Partial<import("@/types").Car>) =>
-    request<{ success: true; data: import("@/types").Car }>("/cars", {
+  createCar: (body: Partial<import("@/src/types").Car>) =>
+    request<{ success: true; data: import("@/src/types").Car }>("/cars", {
       method: "POST",
       body: JSON.stringify(body),
     }),
-  updateCar: (id: string, body: Partial<import("@/types").Car>) =>
-    request<{ success: true; data: import("@/types").Car }>(`/cars/${id}`, {
+  updateCar: (id: string, body: Partial<import("@/src/types").Car>) =>
+    request<{ success: true; data: import("@/src/types").Car }>(`/cars/${id}`, {
       method: "PUT",
       body: JSON.stringify(body),
     }),
   deleteCar: (id: string) => request<void>(`/cars/${id}`, { method: "DELETE" }),
-  updateStatus: (id: string, status: import("@/types").CarStatus) =>
-    request<{ success: true; data: import("@/types").Car }>(
+  updateStatus: (id: string, status: import("@/src/types").CarStatus) =>
+    request<{ success: true; data: import("@/src/types").Car }>(
       `/cars/${id}/status`,
       { method: "PATCH", body: JSON.stringify({ status }) }
     ),
   uploadImages: (id: string, files: File[]) => {
     const fd = new FormData();
     files.forEach((f) => fd.append("images", f));
-    return request<{ success: true; data: import("@/types").Car }>(
+    return request<{ success: true; data: import("@/src/types").Car }>(
       `/cars/${id}/images`,
       { method: "POST", body: fd }
     );
@@ -136,8 +136,10 @@ export const api = {
   enquiries: () =>
     request<{
       success: true;
-      data: import("@/types").Enquiry[];
-      meta: import("@/types").Paginated<import("@/types").Enquiry>["meta"];
+      data: import("@/src/types").Enquiry[];
+      meta: import("@/src/types").Paginated<
+        import("@/src/types").Enquiry
+      >["meta"];
     }>("/admin/enquiries?page=1&pageSize=50"),
   createEnquiry: (body: {
     carId?: string;

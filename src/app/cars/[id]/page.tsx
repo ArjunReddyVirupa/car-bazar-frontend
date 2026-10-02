@@ -1,3 +1,215 @@
 "use client";
-import Link from "next/link";import {useEffect,useState} from "react";import {ArrowLeft,CheckCircle2,FileText,Fuel,Gauge,MapPin,Phone,Send,Settings2,ShieldCheck,UserRound,CalendarDays} from "lucide-react";import {api} from "@/lib/api";import type {Car} from "@/types";import {CarGallery} from "@/components/cars/CarGallery";import {Button} from "@/components/ui/Button";import {Field,Input,Textarea} from "@/components/ui/Input";
-export default function CarDetail({params}:{params:Promise<{id:string}>}){const [car,setCar]=useState<Car|null>(null);const [loading,setLoading]=useState(true);const [sent,setSent]=useState(false);const [error,setError]=useState("");const [form,setForm]=useState({customerName:"",phone:"",message:""});useEffect(()=>{void params.then(({id})=>api.getCar(id).then(r=>setCar(r.data)).catch(e=>setError(e.message)).finally(()=>setLoading(false)))},[params]);if(loading)return <main className="container-page py-20"><div className="h-96 animate-pulse rounded-3xl bg-slate-200"/></main>;if(!car)return <main className="container-page py-20"><Link href="/cars" className="font-bold text-orange-600">← Back to cars</Link><h1 className="mt-5 text-3xl font-black">{error||"Car not found"}</h1></main>;const set=(k:keyof typeof form,v:string)=>setForm(s=>({...s,[k]:v}));const submit=async(e:React.FormEvent)=>{e.preventDefault();try{await api.createEnquiry({carId:car.id,...form});setSent(true)}catch(e){setError(e instanceof Error?e.message:"Unable to send enquiry.")}};const specs=[[CalendarDays,"Year",car.year],[Gauge,"Kilometres",`${car.kmDriven.toLocaleString("en-IN")} km`],[Fuel,"Fuel",car.fuelType],[Settings2,"Transmission",car.transmission],[UserRound,"Owners",`${car.ownerCount}${car.ownerCount===1?"st":"th"} owner`],[MapPin,"Location",car.location]] as const;return <main className="container-page py-8 sm:py-12"><Link href="/cars" className="inline-flex items-center gap-2 text-sm font-black text-slate-500 hover:text-orange-600"><ArrowLeft size={16}/> Back to cars</Link><div className="mt-7 grid gap-8 lg:grid-cols-[1.2fr_.8fr]"><div><CarGallery images={car.images} name={`${car.brand} ${car.model}`}/><div className="mt-8 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100"><p className="text-sm font-black uppercase tracking-widest text-orange-500">About this car</p><h2 className="mt-2 text-2xl font-black">{car.brand} {car.model} {car.variant&&<span className="text-slate-400">• {car.variant}</span>}</h2><p className="mt-4 whitespace-pre-line leading-7 text-slate-600">{car.description||"Contact us for more information about this vehicle."}</p><div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-3">{specs.map(([I,l,v])=><div key={l} className="rounded-2xl bg-slate-50 p-4"><I size={17} className="text-orange-500"/><p className="mt-2 text-xs font-bold text-slate-400">{l}</p><p className="mt-1 text-sm font-black text-slate-800">{v}</p></div>)}</div></div><div className="mt-5 rounded-3xl border border-orange-100 bg-gradient-to-br from-orange-50 to-pink-50 p-6"><div className="flex items-start gap-3"><ShieldCheck className="mt-1 text-orange-600"/><div><h3 className="font-black">Documentation details</h3><p className="mt-1 text-sm leading-6 text-slate-600">{car.rcAvailable?"RC available":"RC availability not specified"}. {car.insuranceAvailable?"Insurance available":"Insurance availability not specified"}. {car.pucAvailable?"PUC available":"PUC availability not specified"}.</p></div></div></div></div><aside className="lg:sticky lg:top-24 lg:self-start"><div className="overflow-hidden rounded-3xl bg-slate-950 p-6 text-white shadow-2xl"><p className="text-sm font-bold text-slate-400">Listed price</p><p className="mt-1 text-4xl font-black">₹{car.price.toLocaleString("en-IN")}</p><p className="mt-2 text-sm text-slate-400">Final price and availability subject to confirmation.</p><div className="my-6 h-px bg-white/10"/>{sent?<div className="rounded-2xl bg-emerald-500/15 p-5"><CheckCircle2 className="text-emerald-400"/><h3 className="mt-3 text-lg font-black">Enquiry received</h3><p className="mt-1 text-sm leading-6 text-slate-300">Our team can contact you about this car.</p></div>:<form onSubmit={submit} className="grid gap-4"><Field label="Your name"><Input required value={form.customerName} onChange={e=>set("customerName",e.target.value)} placeholder="Full name"/></Field><Field label="Phone number"><Input required value={form.phone} onChange={e=>set("phone",e.target.value)} placeholder="10-digit mobile number"/></Field><Field label="Message"><Textarea rows={4} value={form.message} onChange={e=>set("message",e.target.value)} placeholder="I would like to arrange a test drive..."/></Field>{error&&<p className="rounded-xl bg-red-500/10 p-3 text-sm font-semibold text-red-300">{error}</p>}<Button type="submit" className="w-full"><Send size={17}/> Send enquiry</Button></form>}<div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-1"><a href={`tel:${process.env.NEXT_PUBLIC_BUSINESS_PHONE??""}`} className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-3 text-sm font-black hover:bg-white/5"><Phone size={16}/> Call us</a><Link href="/cars" className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-3 text-sm font-black hover:bg-white/5"><FileText size={16}/> More cars</Link></div></div></aside></div></main>}
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  FileText,
+  Fuel,
+  Gauge,
+  MapPin,
+  Phone,
+  Send,
+  Settings2,
+  ShieldCheck,
+  UserRound,
+  CalendarDays,
+} from "lucide-react";
+import { api } from "@/src/lib/api";
+import type { Car } from "@/src/types";
+import { CarGallery } from "@/src/components/cars/CarGallery";
+import { Button } from "@/src/components/ui/Button";
+import { Field, Input, Textarea } from "@/src/components/ui/Input";
+export default function CarDetail({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const [car, setCar] = useState<Car | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState("");
+  const [form, setForm] = useState({
+    customerName: "",
+    phone: "",
+    message: "",
+  });
+  useEffect(() => {
+    void params.then(({ id }) =>
+      api
+        .getCar(id)
+        .then((r) => setCar(r.data))
+        .catch((e) => setError(e.message))
+        .finally(() => setLoading(false))
+    );
+  }, [params]);
+  if (loading)
+    return (
+      <main className="container-page py-20">
+        <div className="h-96 animate-pulse rounded-3xl bg-slate-200" />
+      </main>
+    );
+  if (!car)
+    return (
+      <main className="container-page py-20">
+        <Link href="/cars" className="font-bold text-orange-600">
+          ← Back to cars
+        </Link>
+        <h1 className="mt-5 text-3xl font-black">{error || "Car not found"}</h1>
+      </main>
+    );
+  const set = (k: keyof typeof form, v: string) =>
+    setForm((s) => ({ ...s, [k]: v }));
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await api.createEnquiry({ carId: car.id, ...form });
+      setSent(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unable to send enquiry.");
+    }
+  };
+  const specs = [
+    [CalendarDays, "Year", car.year],
+    [Gauge, "Kilometres", `${car.kmDriven.toLocaleString("en-IN")} km`],
+    [Fuel, "Fuel", car.fuelType],
+    [Settings2, "Transmission", car.transmission],
+    [
+      UserRound,
+      "Owners",
+      `${car.ownerCount}${car.ownerCount === 1 ? "st" : "th"} owner`,
+    ],
+    [MapPin, "Location", car.location],
+  ] as const;
+  return (
+    <main className="container-page py-8 sm:py-12">
+      <Link
+        href="/cars"
+        className="inline-flex items-center gap-2 text-sm font-black text-slate-500 hover:text-orange-600"
+      >
+        <ArrowLeft size={16} /> Back to cars
+      </Link>
+      <div className="mt-7 grid gap-8 lg:grid-cols-[1.2fr_.8fr]">
+        <div>
+          <CarGallery images={car.images} name={`${car.brand} ${car.model}`} />
+          <div className="mt-8 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+            <p className="text-sm font-black uppercase tracking-widest text-orange-500">
+              About this car
+            </p>
+            <h2 className="mt-2 text-2xl font-black">
+              {car.brand} {car.model}{" "}
+              {car.variant && (
+                <span className="text-slate-400">• {car.variant}</span>
+              )}
+            </h2>
+            <p className="mt-4 whitespace-pre-line leading-7 text-slate-600">
+              {car.description ||
+                "Contact us for more information about this vehicle."}
+            </p>
+            <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {specs.map(([I, l, v]) => (
+                <div key={l} className="rounded-2xl bg-slate-50 p-4">
+                  <I size={17} className="text-orange-500" />
+                  <p className="mt-2 text-xs font-bold text-slate-400">{l}</p>
+                  <p className="mt-1 text-sm font-black text-slate-800">{v}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="mt-5 rounded-3xl border border-orange-100 bg-gradient-to-br from-orange-50 to-pink-50 p-6">
+            <div className="flex items-start gap-3">
+              <ShieldCheck className="mt-1 text-orange-600" />
+              <div>
+                <h3 className="font-black">Documentation details</h3>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  {car.rcAvailable
+                    ? "RC available"
+                    : "RC availability not specified"}
+                  .{" "}
+                  {car.insuranceAvailable
+                    ? "Insurance available"
+                    : "Insurance availability not specified"}
+                  .{" "}
+                  {car.pucAvailable
+                    ? "PUC available"
+                    : "PUC availability not specified"}
+                  .
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <aside className="lg:sticky lg:top-24 lg:self-start">
+          <div className="overflow-hidden rounded-3xl bg-slate-950 p-6 text-white shadow-2xl">
+            <p className="text-sm font-bold text-slate-400">Listed price</p>
+            <p className="mt-1 text-4xl font-black">
+              ₹{car.price.toLocaleString("en-IN")}
+            </p>
+            <p className="mt-2 text-sm text-slate-400">
+              Final price and availability subject to confirmation.
+            </p>
+            <div className="my-6 h-px bg-white/10" />
+            {sent ? (
+              <div className="rounded-2xl bg-emerald-500/15 p-5">
+                <CheckCircle2 className="text-emerald-400" />
+                <h3 className="mt-3 text-lg font-black">Enquiry received</h3>
+                <p className="mt-1 text-sm leading-6 text-slate-300">
+                  Our team can contact you about this car.
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={submit} className="grid gap-4">
+                <Field label="Your name">
+                  <Input
+                    required
+                    value={form.customerName}
+                    onChange={(e) => set("customerName", e.target.value)}
+                    placeholder="Full name"
+                  />
+                </Field>
+                <Field label="Phone number">
+                  <Input
+                    required
+                    value={form.phone}
+                    onChange={(e) => set("phone", e.target.value)}
+                    placeholder="10-digit mobile number"
+                  />
+                </Field>
+                <Field label="Message">
+                  <Textarea
+                    rows={4}
+                    value={form.message}
+                    onChange={(e) => set("message", e.target.value)}
+                    placeholder="I would like to arrange a test drive..."
+                  />
+                </Field>
+                {error && (
+                  <p className="rounded-xl bg-red-500/10 p-3 text-sm font-semibold text-red-300">
+                    {error}
+                  </p>
+                )}
+                <Button type="submit" className="w-full">
+                  <Send size={17} /> Send enquiry
+                </Button>
+              </form>
+            )}
+            <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+              <a
+                href={`tel:${process.env.NEXT_PUBLIC_BUSINESS_PHONE ?? ""}`}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-3 text-sm font-black hover:bg-white/5"
+              >
+                <Phone size={16} /> Call us
+              </a>
+              <Link
+                href="/cars"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-3 text-sm font-black hover:bg-white/5"
+              >
+                <FileText size={16} /> More cars
+              </Link>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </main>
+  );
+}

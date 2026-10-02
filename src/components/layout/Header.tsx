@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { CarFront, Menu, X, LayoutDashboard, LogIn } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useStore } from "@/store/useStore";
+import { useStore } from "@/src/store/useStore";
 
 export function Header() {
   const path = usePathname();

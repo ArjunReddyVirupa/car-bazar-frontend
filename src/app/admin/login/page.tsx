@@ -3,9 +3,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CarFront, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
-import { useStore } from "@/store/useStore";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
+import { useStore } from "@/src/store/useStore";
+import { Button } from "@/src/components/ui/Button";
+import { Input } from "@/src/components/ui/Input";
 export default function Login() {
   const router = useRouter();
   const { user, login, hydrateAuth } = useStore();
