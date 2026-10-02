@@ -1,0 +1,1 @@
+export default function Loading(){return <main className="grid min-h-[70vh] place-items-center"><div className="size-10 animate-spin rounded-full border-4 border-orange-200 border-t-orange-500"/></main>}
