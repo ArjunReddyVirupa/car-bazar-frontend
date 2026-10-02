@@ -9,24 +9,52 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function request<T>(
+  path: string,
+  init: RequestInit = {},
+  retry = true
+): Promise<T> {
   const headers = new Headers(init.headers);
-  if (init.body && !(init.body instanceof FormData))
+
+  if (init.body && !(init.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
+  }
+
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
     headers,
     credentials: "include",
     cache: "no-store",
   });
-  if (res.status === 204) return undefined as T;
+
+  // If access token expired, try to refresh it once.
+  if (res.status === 401 && retry && path !== "/auth/refresh") {
+    const refreshResponse = await fetch(`${API_URL}/auth/refresh`, {
+      method: "POST",
+      credentials: "include",
+    });
+
+    if (refreshResponse.ok) {
+      // New access token has been created.
+      // Retry the original request once.
+      return request<T>(path, init, false);
+    }
+  }
+
+  if (res.status === 204) {
+    return undefined as T;
+  }
+
   const payload = await res.json().catch(() => null);
-  if (!res.ok)
+
+  if (!res.ok) {
     throw new ApiError(
       res.status,
       payload?.error?.message ?? payload?.message ?? "Something went wrong.",
       payload?.error?.code ?? payload?.code
     );
+  }
+
   return payload as T;
 }
 
@@ -66,6 +94,15 @@ export const api = {
       "/auth/login",
       { method: "POST", body: JSON.stringify({ email, password }) }
     ),
+  refreshToken: () =>
+    request<{
+      success: true;
+      data: {
+        message: string;
+      };
+    }>("/auth/refresh", {
+      method: "POST",
+    }),
   me: () =>
     request<{ success: true; data: import("@/src/types").User }>("/auth/me"),
   logout: () => request<{ success: true }>("/auth/logout", { method: "POST" }),
