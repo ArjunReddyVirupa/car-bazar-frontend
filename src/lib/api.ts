@@ -122,6 +122,51 @@ export const api = {
       `/cars/${id}/status`,
       { method: "PATCH", body: JSON.stringify({ status }) }
     ),
+  prepareImageUploads: (
+    id: string,
+    files: {
+      name: string;
+      size: number;
+      type: string;
+    }[]
+  ) =>
+    request<{
+      success: true;
+      data: {
+        uploads: {
+          path: string;
+          token: string;
+          signedUrl: string;
+          publicUrl: string;
+          originalName: string;
+          mimeType: string;
+          sizeBytes: number;
+          displayOrder: number;
+        }[];
+      };
+    }>(`/cars/${id}/images/sign`, {
+      method: "POST",
+      body: JSON.stringify({ files }),
+    }),
+
+  completeImageUploads: (
+    id: string,
+    images: {
+      path: string;
+      publicUrl: string;
+      originalName: string;
+      mimeType: string;
+      sizeBytes: number;
+      displayOrder: number;
+    }[]
+  ) =>
+    request<{
+      success: true;
+      data: import("@/src/types").Car;
+    }>(`/cars/${id}/images/complete`, {
+      method: "POST",
+      body: JSON.stringify({ images }),
+    }),
   uploadImages: (id: string, files: File[]) => {
     const fd = new FormData();
     files.forEach((f) => fd.append("images", f));

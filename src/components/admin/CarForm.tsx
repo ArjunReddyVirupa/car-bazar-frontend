@@ -106,7 +106,7 @@ export function CarForm({
 }) {
   const router = useRouter();
 
-  const { createCar, updateCar, uploadImages } = useStore();
+  const { createCar, updateCar, uploadImagesFast } = useStore();
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -357,53 +357,63 @@ export function CarForm({
     });
 
     if (validFiles.length === 0) {
-      if (validationErrors.length) {
-        setError(validationErrors.join(" • "));
-      }
-
+      setError(validationErrors.join(" • "));
       return;
     }
 
     setBusy(true);
 
     try {
+      /*
+       * Compress images concurrently.
+       *
+       * This makes selecting 10-20 large photos much faster
+       * than compressing them one by one.
+       */
+      const compressionResults = await Promise.allSettled(
+        validFiles.map((file) => compressImageForUpload(file))
+      );
+
       const compressedFiles: File[] = [];
 
-      for (const file of validFiles) {
-        try {
-          const compressedFile = await compressImageForUpload(file);
+      compressionResults.forEach((result, index) => {
+        const originalFile = validFiles[index];
 
-          compressedFiles.push(compressedFile);
-        } catch (error) {
-          console.error(`Failed to compress ${file.name}:`, error);
+        if (result.status === "fulfilled") {
+          compressedFiles.push(result.value);
+        } else {
+          console.error(
+            `Failed to compress ${originalFile.name}:`,
+            result.reason
+          );
 
           validationErrors.push(
-            `${file.name}: unable to prepare image for upload`
+            `${originalFile.name}: unable to prepare image for upload`
           );
         }
-      }
+      });
 
       if (compressedFiles.length === 0) {
+        setError(
+          validationErrors.length
+            ? validationErrors.join(" • ")
+            : "Unable to prepare images for upload."
+        );
         return;
       }
 
       setPhotos((current) => {
-        const existingFiles = current.map((photo) => photo.file);
-
-        const newUniqueFiles = compressedFiles.filter((file) => {
-          return !existingFiles.some(
-            (existing) =>
-              existing.name === file.name &&
-              existing.size === file.size &&
-              existing.lastModified === file.lastModified
-          );
-        });
-
         const availableSlots = Math.max(MAX_PHOTOS - current.length, 0);
 
-        const filesToAdd = newUniqueFiles.slice(0, availableSlots);
+        if (availableSlots === 0) {
+          validationErrors.push(`Only ${MAX_PHOTOS} photos can be selected.`);
 
-        if (newUniqueFiles.length > availableSlots) {
+          return current;
+        }
+
+        const filesToAdd = compressedFiles.slice(0, availableSlots);
+
+        if (compressedFiles.length > availableSlots) {
           validationErrors.push(`Only ${MAX_PHOTOS} photos can be selected.`);
         }
 
@@ -417,7 +427,6 @@ export function CarForm({
       setError(validationErrors.join(" • "));
     }
   };
-
   /**
    * File input handler.
    */
@@ -694,35 +703,18 @@ export function CarForm({
       if (photos.length > 0) {
         const files = photos.map((photo) => photo.file);
 
-        const totalBatches = Math.ceil(files.length / PHOTO_UPLOAD_BATCH_SIZE);
-
         setUploadProgress({
           current: 0,
-          total: totalBatches,
+          total: files.length,
         });
 
-        for (
-          let batchStart = 0;
-          batchStart < files.length;
-          batchStart += PHOTO_UPLOAD_BATCH_SIZE
-        ) {
-          const batch = files.slice(
-            batchStart,
-            batchStart + PHOTO_UPLOAD_BATCH_SIZE
-          );
-
-          car = await uploadImages(car.id, batch);
-
-          const completedBatches =
-            Math.floor(batchStart / PHOTO_UPLOAD_BATCH_SIZE) + 1;
-
+        car = await uploadImagesFast(car.id, files, (completed, total) => {
           setUploadProgress({
-            current: completedBatches,
-            total: totalBatches,
+            current: completed,
+            total,
           });
-        }
+        });
       }
-
       router.replace(`/admin/cars/${car.id}/edit`);
     } catch (caughtError) {
       setError(

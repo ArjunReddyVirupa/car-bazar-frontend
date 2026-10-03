@@ -13,6 +13,7 @@ import type { Car, Document, DocumentType } from "@/src/types";
 import { CarForm } from "@/src/components/admin/CarForm";
 // import { Button } from "@/components/ui/Button";
 import { Field, Input, Select, Textarea } from "@/src/components/ui/Input";
+// import { CarFormSkeleton } from "@/src/components/admin/CarFormSkeleton";
 export default function EditCar({
   params,
 }: {
@@ -27,15 +28,25 @@ export default function EditCar({
   const [notes, setNotes] = useState("");
   //   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
   useEffect(() => {
-    void params.then(({ id }) =>
-      Promise.all([api.getCar(id)])
-        .then(([c]) => {
-          setCar(c.data);
+    void params.then(({ id }) => {
+      api
+        .getCar(id)
+        .then((response) => {
+          setCar(response.data);
         })
-        .catch((e) => setError(e.message))
-    );
+        .catch((error) => {
+          setError(
+            error instanceof Error ? error.message : "Unable to load car."
+          );
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    });
   }, [params]);
+
   if (!car)
     return (
       <div className="mx-auto max-w-6xl py-10">

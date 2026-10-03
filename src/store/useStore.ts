@@ -3,6 +3,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { api, ApiError } from "@/src/lib/api";
 import type { Car, CarStatus, User } from "@/src/types";
+import { supabase } from "@/src/lib/supabase";
 
 interface Store {
   cars: Car[];
@@ -25,6 +26,11 @@ interface Store {
   uploadImages: (id: string, files: File[]) => Promise<Car>;
   deleteImage: (carId: string, imageId: string) => Promise<void>;
   resetError: () => void;
+  uploadImagesFast: (
+    id: string,
+    files: File[],
+    onProgress?: (completed: number, total: number) => void
+  ) => Promise<Car>;
 }
 
 export const useStore = create<Store>()(
@@ -77,6 +83,7 @@ export const useStore = create<Store>()(
             : [car, ...s.cars],
           cacheAt: Date.now(),
         })),
+
       removeCar: (id) =>
         set((s) => ({
           cars: s.cars.filter((c) => c.id !== id),
@@ -117,6 +124,81 @@ export const useStore = create<Store>()(
           });
       },
       resetError: () => set({ error: null }),
+      uploadImagesFast: async (id, files, onProgress) => {
+        const CONCURRENCY = 3;
+
+        const { data } = await api.prepareImageUploads(
+          id,
+          files.map((file) => ({
+            name: file.name,
+            size: file.size,
+            type: file.type,
+          }))
+        );
+
+        const uploads = data.uploads;
+
+        let completed = 0;
+
+        const results: typeof uploads = [];
+
+        let nextIndex = 0;
+
+        const worker = async () => {
+          while (true) {
+            const index = nextIndex++;
+
+            if (index >= uploads.length) {
+              return;
+            }
+
+            const target = uploads[index];
+            const file = files[index];
+
+            const { data, error } = await supabase.storage
+              .from("car-images")
+              .uploadToSignedUrl(target.path, target.token, file);
+
+            if (error) {
+              throw new Error(error.message);
+            }
+
+            results[index] = {
+              ...target,
+              sizeBytes: file.size,
+            };
+
+            completed += 1;
+
+            onProgress?.(completed, files.length);
+          }
+        };
+
+        await Promise.all(
+          Array.from(
+            {
+              length: Math.min(CONCURRENCY, uploads.length),
+            },
+            () => worker()
+          )
+        );
+
+        const { data: car } = await api.completeImageUploads(
+          id,
+          results.map((image) => ({
+            path: image.path,
+            publicUrl: image.publicUrl,
+            originalName: image.originalName,
+            mimeType: "image/webp",
+            sizeBytes: image.sizeBytes,
+            displayOrder: image.displayOrder,
+          }))
+        );
+
+        get().upsertCar(car);
+
+        return car;
+      },
     }),
     {
       name: "carbazar-cache",
