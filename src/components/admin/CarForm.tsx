@@ -28,7 +28,7 @@ const MAX_IMAGE_HEIGHT = 1500;
 const INITIAL_WEBP_QUALITY = 0.82;
 const MIN_WEBP_QUALITY = 0.55;
 const WEBP_QUALITY_STEP = 0.05;
-const PHOTO_UPLOAD_BATCH_SIZE = 1;
+const PHOTO_COMPRESSION_CONCURRENCY = 3;
 
 const ACCEPTED_IMAGE_TYPES = [
   "image/jpeg",
@@ -370,28 +370,39 @@ export function CarForm({
        * This makes selecting 10-20 large photos much faster
        * than compressing them one by one.
        */
-      const compressionResults = await Promise.allSettled(
-        validFiles.map((file) => compressImageForUpload(file))
-      );
-
       const compressedFiles: File[] = [];
 
-      compressionResults.forEach((result, index) => {
-        const originalFile = validFiles[index];
+      for (
+        let start = 0;
+        start < validFiles.length;
+        start += PHOTO_COMPRESSION_CONCURRENCY
+      ) {
+        const batch = validFiles.slice(
+          start,
+          start + PHOTO_COMPRESSION_CONCURRENCY
+        );
 
-        if (result.status === "fulfilled") {
-          compressedFiles.push(result.value);
-        } else {
-          console.error(
-            `Failed to compress ${originalFile.name}:`,
-            result.reason
-          );
+        const results = await Promise.allSettled(
+          batch.map((file) => compressImageForUpload(file))
+        );
 
-          validationErrors.push(
-            `${originalFile.name}: unable to prepare image for upload`
-          );
-        }
-      });
+        results.forEach((result, index) => {
+          const originalFile = batch[index];
+
+          if (result.status === "fulfilled") {
+            compressedFiles.push(result.value);
+          } else {
+            console.error(
+              `Failed to compress ${originalFile.name}:`,
+              result.reason
+            );
+
+            validationErrors.push(
+              `${originalFile.name}: unable to prepare image for upload`
+            );
+          }
+        });
+      }
 
       if (compressedFiles.length === 0) {
         setError(
@@ -507,72 +518,83 @@ export function CarForm({
   };
 
   async function compressImageForUpload(file: File): Promise<File> {
-    const bitmap = await createImageBitmap(file);
-
     try {
-      const scale = Math.min(
-        1,
-        MAX_IMAGE_WIDTH / bitmap.width,
-        MAX_IMAGE_HEIGHT / bitmap.height
-      );
+      const bitmap = await createImageBitmap(file);
 
-      const width = Math.max(1, Math.round(bitmap.width * scale));
-      const height = Math.max(1, Math.round(bitmap.height * scale));
-
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-
-      const context = canvas.getContext("2d");
-
-      if (!context) {
-        throw new Error("Unable to prepare image for upload.");
-      }
-
-      context.drawImage(bitmap, 0, 0, width, height);
-
-      const canvasToWebP = (quality: number): Promise<Blob> =>
-        new Promise((resolve, reject) => {
-          canvas.toBlob(
-            (blob) => {
-              if (!blob) {
-                reject(new Error("Unable to compress image."));
-                return;
-              }
-
-              resolve(blob);
-            },
-            "image/webp",
-            quality
-          );
-        });
-
-      let quality = INITIAL_WEBP_QUALITY;
-      let blob = await canvasToWebP(quality);
-
-      while (
-        blob.size > MAX_COMPRESSED_IMAGE_BYTES &&
-        quality > MIN_WEBP_QUALITY
-      ) {
-        quality = Math.max(MIN_WEBP_QUALITY, quality - WEBP_QUALITY_STEP);
-
-        blob = await canvasToWebP(quality);
-      }
-
-      if (blob.size > MAX_COMPRESSED_IMAGE_BYTES) {
-        throw new Error(
-          `Image "${file.name}" could not be compressed below 3.5 MB.`
+      try {
+        const scale = Math.min(
+          1,
+          MAX_IMAGE_WIDTH / bitmap.width,
+          MAX_IMAGE_HEIGHT / bitmap.height
         );
+
+        const width = Math.max(1, Math.round(bitmap.width * scale));
+        const height = Math.max(1, Math.round(bitmap.height * scale));
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+
+        const context = canvas.getContext("2d");
+
+        if (!context) {
+          throw new Error("Unable to prepare image for upload.");
+        }
+
+        context.drawImage(bitmap, 0, 0, width, height);
+
+        const canvasToWebP = (quality: number): Promise<Blob> =>
+          new Promise((resolve, reject) => {
+            canvas.toBlob(
+              (blob) => {
+                if (!blob) {
+                  reject(new Error("Unable to compress image."));
+                  return;
+                }
+
+                resolve(blob);
+              },
+              "image/webp",
+              quality
+            );
+          });
+
+        let quality = INITIAL_WEBP_QUALITY;
+        let blob = await canvasToWebP(quality);
+
+        while (
+          blob.size > MAX_COMPRESSED_IMAGE_BYTES &&
+          quality > MIN_WEBP_QUALITY
+        ) {
+          quality = Math.max(MIN_WEBP_QUALITY, quality - WEBP_QUALITY_STEP);
+
+          blob = await canvasToWebP(quality);
+        }
+
+        if (blob.size > MAX_COMPRESSED_IMAGE_BYTES) {
+          throw new Error(
+            `Image "${file.name}" could not be compressed below 3.5 MB.`
+          );
+        }
+
+        const baseName = file.name.replace(/\.[^/.]+$/, "");
+
+        return new File([blob], `${baseName}.webp`, {
+          type: "image/webp",
+          lastModified: Date.now(),
+        });
+      } finally {
+        bitmap.close();
       }
-
-      const baseName = file.name.replace(/\.[^/.]+$/, "");
-
-      return new File([blob], `${baseName}.webp`, {
-        type: "image/webp",
-        lastModified: Date.now(),
+    } catch (error) {
+      console.error("IMAGE PREPARATION FAILED:", {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        error,
       });
-    } finally {
-      bitmap.close();
+
+      throw new Error(`Unable to prepare image for upload: ${file.name}`);
     }
   }
 

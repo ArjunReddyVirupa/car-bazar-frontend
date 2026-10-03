@@ -153,9 +153,7 @@ export const api = {
     id: string,
     images: {
       path: string;
-      publicUrl: string;
       originalName: string;
-      mimeType: string;
       sizeBytes: number;
       displayOrder: number;
     }[]

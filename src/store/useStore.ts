@@ -187,9 +187,7 @@ export const useStore = create<Store>()(
           id,
           results.map((image) => ({
             path: image.path,
-            publicUrl: image.publicUrl,
             originalName: image.originalName,
-            mimeType: "image/webp",
             sizeBytes: image.sizeBytes,
             displayOrder: image.displayOrder,
           }))
