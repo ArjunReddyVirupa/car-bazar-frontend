@@ -737,7 +737,7 @@ export function CarForm({
           });
         });
       }
-      router.replace(`/admin/cars/${car.id}/edit`);
+      router.replace(`/cars`);
     } catch (caughtError) {
       setError(
         caughtError instanceof Error
