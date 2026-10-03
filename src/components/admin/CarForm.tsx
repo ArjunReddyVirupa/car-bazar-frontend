@@ -20,11 +20,15 @@ import { api } from "@/src/lib/api";
 import type { VehicleCatalogItem } from "@/src/lib/api";
 
 const MAX_PHOTOS = 20;
-
-// Maximum size of the ORIGINAL image selected by admin.
-// Sharp will optimize/convert it to WebP on the backend.
 const MAX_FILE_SIZE_MB = 20;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+const MAX_COMPRESSED_IMAGE_BYTES = 3.5 * 1024 * 1024;
+const MAX_IMAGE_WIDTH = 2000;
+const MAX_IMAGE_HEIGHT = 1500;
+const INITIAL_WEBP_QUALITY = 0.82;
+const MIN_WEBP_QUALITY = 0.55;
+const WEBP_QUALITY_STEP = 0.05;
+const PHOTO_UPLOAD_BATCH_SIZE = 1;
 
 const ACCEPTED_IMAGE_TYPES = [
   "image/jpeg",
@@ -201,6 +205,10 @@ export function CarForm({
   const [dragActive, setDragActive] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [uploadProgress, setUploadProgress] = useState({
+    current: 0,
+    total: 0,
+  });
   const [brands, setBrands] = useState<VehicleCatalogItem[]>([]);
   const [models, setModels] = useState<VehicleCatalogItem[]>([]);
   const [variants, setVariants] = useState<VehicleCatalogItem[]>([]);
@@ -325,7 +333,7 @@ export function CarForm({
   /**
    * Validate and add files.
    */
-  const addPhotos = (incomingFiles: File[]) => {
+  const addPhotos = async (incomingFiles: File[]) => {
     if (!incomingFiles.length) {
       return;
     }
@@ -337,43 +345,73 @@ export function CarForm({
     const validFiles = incomingFiles.filter((file) => {
       if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
         validationErrors.push(`${file.name}: unsupported image format`);
-
         return false;
       }
 
       if (file.size > MAX_FILE_SIZE_BYTES) {
         validationErrors.push(`${file.name}: exceeds ${MAX_FILE_SIZE_MB} MB`);
-
         return false;
       }
 
       return true;
     });
 
-    setPhotos((current) => {
-      const existingFiles = current.map((photo) => photo.file);
-
-      const newUniqueFiles = validFiles.filter((file) => {
-        return !existingFiles.some(
-          (existing) =>
-            existing.name === file.name &&
-            existing.size === file.size &&
-            existing.lastModified === file.lastModified
-        );
-      });
-
-      const availableSlots = Math.max(MAX_PHOTOS - current.length, 0);
-
-      const filesToAdd = newUniqueFiles.slice(0, availableSlots);
-
-      if (newUniqueFiles.length > availableSlots) {
-        validationErrors.push(
-          `Only ${MAX_PHOTOS} photos can be selected at once.`
-        );
+    if (validFiles.length === 0) {
+      if (validationErrors.length) {
+        setError(validationErrors.join(" • "));
       }
 
-      return [...current, ...createPhotoPreviews(filesToAdd)];
-    });
+      return;
+    }
+
+    setBusy(true);
+
+    try {
+      const compressedFiles: File[] = [];
+
+      for (const file of validFiles) {
+        try {
+          const compressedFile = await compressImageForUpload(file);
+
+          compressedFiles.push(compressedFile);
+        } catch (error) {
+          console.error(`Failed to compress ${file.name}:`, error);
+
+          validationErrors.push(
+            `${file.name}: unable to prepare image for upload`
+          );
+        }
+      }
+
+      if (compressedFiles.length === 0) {
+        return;
+      }
+
+      setPhotos((current) => {
+        const existingFiles = current.map((photo) => photo.file);
+
+        const newUniqueFiles = compressedFiles.filter((file) => {
+          return !existingFiles.some(
+            (existing) =>
+              existing.name === file.name &&
+              existing.size === file.size &&
+              existing.lastModified === file.lastModified
+          );
+        });
+
+        const availableSlots = Math.max(MAX_PHOTOS - current.length, 0);
+
+        const filesToAdd = newUniqueFiles.slice(0, availableSlots);
+
+        if (newUniqueFiles.length > availableSlots) {
+          validationErrors.push(`Only ${MAX_PHOTOS} photos can be selected.`);
+        }
+
+        return [...current, ...createPhotoPreviews(filesToAdd)];
+      });
+    } finally {
+      setBusy(false);
+    }
 
     if (validationErrors.length) {
       setError(validationErrors.join(" • "));
@@ -459,6 +497,76 @@ export function CarForm({
     setDragActive(true);
   };
 
+  async function compressImageForUpload(file: File): Promise<File> {
+    const bitmap = await createImageBitmap(file);
+
+    try {
+      const scale = Math.min(
+        1,
+        MAX_IMAGE_WIDTH / bitmap.width,
+        MAX_IMAGE_HEIGHT / bitmap.height
+      );
+
+      const width = Math.max(1, Math.round(bitmap.width * scale));
+      const height = Math.max(1, Math.round(bitmap.height * scale));
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+
+      const context = canvas.getContext("2d");
+
+      if (!context) {
+        throw new Error("Unable to prepare image for upload.");
+      }
+
+      context.drawImage(bitmap, 0, 0, width, height);
+
+      const canvasToWebP = (quality: number): Promise<Blob> =>
+        new Promise((resolve, reject) => {
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) {
+                reject(new Error("Unable to compress image."));
+                return;
+              }
+
+              resolve(blob);
+            },
+            "image/webp",
+            quality
+          );
+        });
+
+      let quality = INITIAL_WEBP_QUALITY;
+      let blob = await canvasToWebP(quality);
+
+      while (
+        blob.size > MAX_COMPRESSED_IMAGE_BYTES &&
+        quality > MIN_WEBP_QUALITY
+      ) {
+        quality = Math.max(MIN_WEBP_QUALITY, quality - WEBP_QUALITY_STEP);
+
+        blob = await canvasToWebP(quality);
+      }
+
+      if (blob.size > MAX_COMPRESSED_IMAGE_BYTES) {
+        throw new Error(
+          `Image "${file.name}" could not be compressed below 3.5 MB.`
+        );
+      }
+
+      const baseName = file.name.replace(/\.[^/.]+$/, "");
+
+      return new File([blob], `${baseName}.webp`, {
+        type: "image/webp",
+        lastModified: Date.now(),
+      });
+    } finally {
+      bitmap.close();
+    }
+  }
+
   /**
    * Drag leave.
    */
@@ -535,6 +643,10 @@ export function CarForm({
 
     setBusy(true);
     setError("");
+    setUploadProgress({
+      current: 0,
+      total: 0,
+    });
 
     try {
       const body = {
@@ -580,10 +692,35 @@ export function CarForm({
        * Upload all selected images in one operation.
        */
       if (photos.length > 0) {
-        car = await uploadImages(
-          car.id,
-          photos.map((photo) => photo.file)
-        );
+        const files = photos.map((photo) => photo.file);
+
+        const totalBatches = Math.ceil(files.length / PHOTO_UPLOAD_BATCH_SIZE);
+
+        setUploadProgress({
+          current: 0,
+          total: totalBatches,
+        });
+
+        for (
+          let batchStart = 0;
+          batchStart < files.length;
+          batchStart += PHOTO_UPLOAD_BATCH_SIZE
+        ) {
+          const batch = files.slice(
+            batchStart,
+            batchStart + PHOTO_UPLOAD_BATCH_SIZE
+          );
+
+          car = await uploadImages(car.id, batch);
+
+          const completedBatches =
+            Math.floor(batchStart / PHOTO_UPLOAD_BATCH_SIZE) + 1;
+
+          setUploadProgress({
+            current: completedBatches,
+            total: totalBatches,
+          });
+        }
       }
 
       router.replace(`/admin/cars/${car.id}/edit`);
@@ -595,6 +732,10 @@ export function CarForm({
       );
     } finally {
       setBusy(false);
+      setUploadProgress({
+        current: 0,
+        total: 0,
+      });
     }
   };
 
@@ -1012,7 +1153,7 @@ export function CarForm({
 
             <p className="mt-1 text-xs font-semibold text-slate-400">
               Maximum {MAX_PHOTOS} photos · Maximum {MAX_FILE_SIZE_MB} MB per
-              image
+              image · Images are automatically compressed before upload
             </p>
           </div>
 
@@ -1161,7 +1302,9 @@ export function CarForm({
               {busy ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
-                  Saving…
+                  {uploadProgress.total > 0
+                    ? `Uploading photos ${uploadProgress.current}/${uploadProgress.total}…`
+                    : "Saving…"}
                 </>
               ) : (
                 <>
