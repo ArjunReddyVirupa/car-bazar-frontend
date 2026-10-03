@@ -20,7 +20,10 @@ import { api } from "@/src/lib/api";
 import type { VehicleCatalogItem } from "@/src/lib/api";
 
 const MAX_PHOTOS = 20;
-const MAX_FILE_SIZE_MB = 10;
+
+// Maximum size of the ORIGINAL image selected by admin.
+// Sharp will optimize/convert it to WebP on the backend.
+const MAX_FILE_SIZE_MB = 20;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 const ACCEPTED_IMAGE_TYPES = [
@@ -103,30 +106,96 @@ export function CarForm({
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [form, setForm] = useState<Record<string, any>>(
-    initial
-      ? {
-          ...base,
-          ...initial,
-          price: String(initial.price),
-          kmDriven: String(initial.kmDriven),
-          ownerCount: String(initial.ownerCount),
+  const [form, setForm] = useState<Record<string, any>>(() => {
+    if (!initial) {
+      return base;
+    }
 
-          financeOutstanding:
-            initial.financeOutstanding == null
-              ? ""
-              : String(initial.financeOutstanding),
+    return {
+      ...base,
 
-          insuranceValidUntil: initial.insuranceValidUntil?.slice(0, 10) || "",
+      brand: initial.brand ?? "",
+      model: initial.model ?? "",
+      variant: initial.variant ?? "",
 
-          pucValidUntil: initial.pucValidUntil?.slice(0, 10) || "",
+      year: initial.year ?? new Date().getFullYear(),
 
-          lastServiceDate: initial.lastServiceDate?.slice(0, 10) || "",
+      price: initial.price != null ? String(initial.price) : "",
 
-          warrantyValidUntil: initial.warrantyValidUntil?.slice(0, 10) || "",
-        }
-      : base
-  );
+      kmDriven: initial.kmDriven != null ? String(initial.kmDriven) : "",
+
+      fuelType: initial.fuelType ?? "DIESEL",
+
+      transmission: initial.transmission ?? "MANUAL",
+
+      ownerCount: initial.ownerCount != null ? String(initial.ownerCount) : "1",
+
+      location: initial.location ?? "",
+
+      description: initial.description ?? "",
+
+      color: initial.color ?? "",
+
+      ownerType: initial.ownerType ?? "INDIVIDUAL",
+
+      rcAvailable: initial.rcAvailable ?? false,
+      rcTransferAvailable: initial.rcTransferAvailable ?? false,
+      originalRcAvailable: initial.originalRcAvailable ?? false,
+      rcNotes: initial.rcNotes ?? "",
+
+      insuranceAvailable: initial.insuranceAvailable ?? false,
+
+      insuranceType: initial.insuranceType ?? "COMPREHENSIVE",
+
+      insuranceValidUntil: initial.insuranceValidUntil?.slice(0, 10) ?? "",
+
+      insuranceCompany: initial.insuranceCompany ?? "",
+
+      insurancePolicyNumber: initial.insurancePolicyNumber ?? "",
+
+      pucAvailable: initial.pucAvailable ?? false,
+
+      pucValidUntil: initial.pucValidUntil?.slice(0, 10) ?? "",
+
+      buyerFinanceAvailable: initial.buyerFinanceAvailable ?? false,
+
+      existingFinance: initial.existingFinance ?? false,
+
+      financeCompany: initial.financeCompany ?? "",
+
+      financeOutstanding:
+        initial.financeOutstanding != null
+          ? String(initial.financeOutstanding)
+          : "",
+
+      financeClosed: initial.financeClosed ?? false,
+
+      serviceHistoryAvailable: initial.serviceHistoryAvailable ?? false,
+
+      serviceHistoryNotes: initial.serviceHistoryNotes ?? "",
+
+      lastServiceDate: initial.lastServiceDate?.slice(0, 10) ?? "",
+
+      lastServiceKm:
+        initial.lastServiceKm != null ? String(initial.lastServiceKm) : "",
+
+      accidentHistory: initial.accidentHistory ?? false,
+
+      accidentHistoryNotes: initial.accidentHistoryNotes ?? "",
+
+      conditionNotes: initial.conditionNotes ?? "",
+
+      warrantyAvailable: initial.warrantyAvailable ?? false,
+
+      warrantyValidUntil: initial.warrantyValidUntil?.slice(0, 10) ?? "",
+
+      warrantyNotes: initial.warrantyNotes ?? "",
+
+      status: initial.status ?? "AVAILABLE",
+
+      featured: initial.featured ?? false,
+    };
+  });
 
   const [photos, setPhotos] = useState<PhotoPreview[]>([]);
   const [dragActive, setDragActive] = useState(false);
@@ -146,19 +215,81 @@ export function CarForm({
   );
 
   useEffect(() => {
-    api
-      .getVehicleBrands()
-      .then((response) => {
-        setBrands(response.data);
-      })
-      .catch((error) => {
+    let cancelled = false;
+
+    const loadCatalogForEdit = async () => {
+      try {
+        const response = await api.getVehicleBrands();
+
+        if (cancelled) return;
+
+        const loadedBrands = response.data;
+
+        setBrands(loadedBrands);
+
+        // Create mode
+        if (!initial?.brand) {
+          return;
+        }
+
+        // Find existing brand by name
+        const selectedBrand = loadedBrands.find(
+          (brand) => brand.name.toLowerCase() === initial.brand.toLowerCase()
+        );
+
+        if (!selectedBrand) {
+          return;
+        }
+
+        setBrandId(selectedBrand.id);
+
+        // Load models for the existing brand
+        const modelsResponse = await api.getVehicleModels(selectedBrand.id);
+
+        if (cancelled) return;
+
+        const loadedModels = modelsResponse.data;
+
+        setModels(loadedModels);
+
+        if (!initial.model) {
+          return;
+        }
+
+        // Find existing model by name
+        const selectedModel = loadedModels.find(
+          (model) => model.name.toLowerCase() === initial.model.toLowerCase()
+        );
+
+        if (!selectedModel) {
+          return;
+        }
+
+        setModelId(selectedModel.id);
+
+        // Load variants for the existing model
+        const variantsResponse = await api.getVehicleVariants(selectedModel.id);
+
+        if (cancelled) return;
+
+        setVariants(variantsResponse.data);
+      } catch (error) {
+        if (cancelled) return;
+
         setError(
           error instanceof Error
             ? error.message
-            : "Failed to load vehicle brands."
+            : "Failed to load vehicle catalog."
         );
-      });
-  }, []);
+      }
+    };
+
+    void loadCatalogForEdit();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initial?.brand, initial?.model]);
 
   const set = (key: string, value: any) => {
     setForm((current) => ({
