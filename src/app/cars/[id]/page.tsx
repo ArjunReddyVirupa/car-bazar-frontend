@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   UserRound,
   CalendarDays,
+  Share2,
 } from "lucide-react";
 import { api } from "@/src/lib/api";
 import type { Car } from "@/src/types";
@@ -81,14 +82,54 @@ export default function CarDetail({
     ],
     [MapPin, "Location", car.location],
   ] as const;
+
+  const shareCar = async () => {
+    const url = window.location.href;
+
+    const shareData = {
+      title: `${car.brand} ${car.model}${car.variant ? ` ${car.variant}` : ""}`,
+      text: `${car.brand} ${car.model}${
+        car.variant ? ` ${car.variant}` : ""
+      } - ₹${car.price.toLocaleString("en-IN")} | ${car.kmDriven.toLocaleString(
+        "en-IN"
+      )} km`,
+      url,
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(url);
+        alert("Car link copied to clipboard.");
+      }
+    } catch (error) {
+      // User cancelled the share sheet.
+      if (error instanceof Error && error.name !== "AbortError") {
+        console.error("Unable to share car:", error);
+      }
+    }
+  };
+
   return (
     <main className="container-page py-8 sm:py-12">
-      <Link
-        href="/cars"
-        className="inline-flex items-center gap-2 text-sm font-black text-slate-500 hover:text-orange-600"
-      >
-        <ArrowLeft size={16} /> Back to cars
-      </Link>
+      <div className="flex items-center justify-between gap-3">
+        <Link
+          href="/cars"
+          className="inline-flex items-center gap-2 text-sm font-black text-slate-500 hover:text-orange-600"
+        >
+          <ArrowLeft size={16} /> Back to cars
+        </Link>
+
+        <button
+          type="button"
+          onClick={shareCar}
+          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 shadow-sm transition hover:border-orange-200 hover:bg-orange-50 hover:text-orange-600"
+        >
+          <Share2 size={17} />
+          Share
+        </button>
+      </div>
       <div className="mt-7 grid gap-8 lg:grid-cols-[1.2fr_.8fr]">
         <div>
           <CarGallery images={car.images} name={`${car.brand} ${car.model}`} />

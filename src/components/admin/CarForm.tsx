@@ -47,7 +47,7 @@ const base = {
   fuelType: "DIESEL",
   transmission: "MANUAL",
   ownerCount: "1",
-  location: "",
+  location: "Kurnool",
   description: "",
   //   registrationNumber: "",
   //   registrationState: "",
@@ -134,7 +134,7 @@ export function CarForm({
 
       ownerCount: initial.ownerCount != null ? String(initial.ownerCount) : "1",
 
-      location: initial.location ?? "",
+      location: "Kurnool", //initial.location ?? "Kurnool",
 
       description: initial.description ?? "",
 
@@ -929,6 +929,7 @@ export function CarForm({
               value={form.location}
               onChange={(event) => set("location", event.target.value)}
               placeholder="Kurnool"
+              readOnly
             />
           </Field>
 
@@ -1086,14 +1087,14 @@ export function CarForm({
             />
           </Field>
 
-          <Field label="Last service km">
+          {/* <Field label="Last service km">
             <Input
               type="number"
               min="0"
               value={form.lastServiceKm}
               onChange={(event) => set("lastServiceKm", event.target.value)}
             />
-          </Field>
+          </Field> */}
 
           <div>
             {bool("serviceHistoryAvailable", "Service history available")}
@@ -1102,8 +1103,8 @@ export function CarForm({
           <div>{bool("accidentHistory", "Accident history")}</div>
         </div>
 
-        <div className="mt-4 grid gap-4">
-          <Field label="Service history notes">
+        {/* <div className="mt-4 grid gap-4"> */}
+        {/* <Field label="Service history notes">
             <Textarea
               rows={3}
               value={form.serviceHistoryNotes}
@@ -1111,9 +1112,9 @@ export function CarForm({
                 set("serviceHistoryNotes", event.target.value)
               }
             />
-          </Field>
+          </Field> */}
 
-          <Field label="Accident history notes">
+        {/* <Field label="Accident history notes">
             <Textarea
               rows={3}
               value={form.accidentHistoryNotes}
@@ -1129,9 +1130,9 @@ export function CarForm({
               value={form.conditionNotes}
               onChange={(event) => set("conditionNotes", event.target.value)}
             />
-          </Field>
+          </Field> */}
 
-          <div className="grid gap-3 sm:grid-cols-2">
+        {/* <div className="grid gap-3 sm:grid-cols-2">
             {bool("warrantyAvailable", "Warranty available")}
 
             <Field label="Warranty valid until">
@@ -1143,16 +1144,16 @@ export function CarForm({
                 }
               />
             </Field>
-          </div>
+          </div> */}
 
-          <Field label="Warranty notes">
+        {/* <Field label="Warranty notes">
             <Textarea
               rows={3}
               value={form.warrantyNotes}
               onChange={(event) => set("warrantyNotes", event.target.value)}
             />
           </Field>
-        </div>
+        </div> */}
       </section>
 
       {/* Photos */}
@@ -1331,11 +1332,11 @@ export function CarForm({
           </div>
         </div>
 
-        {error && (
+        {/* {error && (
           <p className="mt-2 rounded-xl bg-red-50 p-2 text-sm font-bold text-red-700">
             {error}
           </p>
-        )}
+        )} */}
       </div>
     </form>
   );
