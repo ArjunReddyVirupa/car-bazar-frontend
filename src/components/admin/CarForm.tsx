@@ -21,12 +21,9 @@ import type { VehicleCatalogItem } from "@/src/lib/api";
 const MAX_PHOTOS = 20;
 const MAX_FILE_SIZE_MB = 20;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
-const MAX_COMPRESSED_IMAGE_BYTES = 3.5 * 1024 * 1024;
-const MAX_IMAGE_WIDTH = 2000;
-const MAX_IMAGE_HEIGHT = 1500;
-const INITIAL_WEBP_QUALITY = 0.82;
-const MIN_WEBP_QUALITY = 0.55;
-const WEBP_QUALITY_STEP = 0.05;
+const MAX_COMPRESSED_IMAGE_BYTES = 3 * 1024 * 1024;
+const MAX_IMAGE_WIDTH = 1800;
+const MAX_IMAGE_HEIGHT = 1350;
 const PHOTO_COMPRESSION_CONCURRENCY = 3;
 
 const ACCEPTED_IMAGE_TYPES = [
@@ -35,6 +32,28 @@ const ACCEPTED_IMAGE_TYPES = [
   "image/webp",
   "image/avif",
 ];
+
+const INSURANCE_COMPANIES = [
+  "ACKO",
+  "Bajaj Allianz",
+  "Chola MS",
+  "Digit",
+  "HDFC ERGO",
+  "ICICI Lombard",
+  "IFFCO Tokio",
+  "Liberty General",
+  "Magma HDI",
+  "National Insurance",
+  "New India Assurance",
+  "Oriental Insurance",
+  "Reliance General",
+  "Royal Sundaram",
+  "SBI General",
+  "Tata AIG",
+  "United India Insurance",
+  "Universal Sompo",
+  "Other",
+] as const;
 
 const base = {
   brand: "",
@@ -305,14 +324,16 @@ export function CarForm({
     }));
   };
 
+  function createClientId(): string {
+    return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+  }
+
   /**
    * Create preview objects for newly selected images.
    */
   const createPhotoPreviews = (files: File[]) => {
     return files.map((file) => ({
-      id: `${file.name}-${file.size}-${
-        file.lastModified
-      }-${crypto.randomUUID()}`,
+      id: `${file.name}-${file.size}-${file.lastModified}-${createClientId()}`,
       file,
       url: URL.createObjectURL(file),
     }));
@@ -525,9 +546,8 @@ export function CarForm({
 
         img.onload = () => resolve(img);
 
-        img.onerror = () => {
+        img.onerror = () =>
           reject(new Error(`Unable to decode image "${file.name}".`));
-        };
 
         img.src = objectUrl;
       });
@@ -539,67 +559,97 @@ export function CarForm({
         throw new Error(`Invalid image dimensions for "${file.name}".`);
       }
 
-      const scale = Math.min(
+      /*
+       * Start with your normal maximum dimensions.
+       */
+      let width = originalWidth;
+      let height = originalHeight;
+
+      const initialScale = Math.min(
         1,
-        MAX_IMAGE_WIDTH / originalWidth,
-        MAX_IMAGE_HEIGHT / originalHeight
+        MAX_IMAGE_WIDTH / width,
+        MAX_IMAGE_HEIGHT / height
       );
 
-      const width = Math.max(1, Math.round(originalWidth * scale));
-      const height = Math.max(1, Math.round(originalHeight * scale));
+      width = Math.max(1, Math.round(width * initialScale));
 
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
+      height = Math.max(1, Math.round(height * initialScale));
 
-      const context = canvas.getContext("2d");
+      /*
+       * We will try a few dimension levels if the
+       * image is still too large.
+       */
+      const dimensionLevels = [
+        { width, height },
+        {
+          width: Math.round(width * 0.85),
+          height: Math.round(height * 0.85),
+        },
+        {
+          width: Math.round(width * 0.7),
+          height: Math.round(height * 0.7),
+        },
+        {
+          width: Math.round(width * 0.55),
+          height: Math.round(height * 0.55),
+        },
+      ];
 
-      if (!context) {
-        throw new Error("Unable to create image canvas.");
+      for (const dimensions of dimensionLevels) {
+        const canvas = document.createElement("canvas");
+
+        canvas.width = Math.max(1, dimensions.width);
+        canvas.height = Math.max(1, dimensions.height);
+
+        const context = canvas.getContext("2d");
+
+        if (!context) {
+          throw new Error("Unable to create image canvas.");
+        }
+
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = "high";
+
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+        /*
+         * Start with high quality and gradually reduce it.
+         */
+        const qualities = [0.82, 0.76, 0.7, 0.64, 0.58, 0.52, 0.46, 0.4];
+
+        for (const quality of qualities) {
+          const blob = await new Promise<Blob>((resolve, reject) => {
+            canvas.toBlob(
+              (result) => {
+                if (!result) {
+                  reject(new Error("Unable to create WebP image."));
+                  return;
+                }
+
+                resolve(result);
+              },
+              "image/webp",
+              quality
+            );
+          });
+
+          /*
+           * Success!
+           */
+          if (blob.size <= MAX_COMPRESSED_IMAGE_BYTES) {
+            const baseName = file.name.replace(/\.[^/.]+$/, "");
+
+            return new File([blob], `${baseName}.webp`, {
+              type: "image/webp",
+              lastModified: Date.now(),
+            });
+          }
+        }
       }
 
-      context.drawImage(image, 0, 0, width, height);
-
-      const canvasToWebP = (quality: number): Promise<Blob> =>
-        new Promise((resolve, reject) => {
-          canvas.toBlob(
-            (blob) => {
-              if (!blob) {
-                reject(new Error("Unable to create WebP image."));
-                return;
-              }
-
-              resolve(blob);
-            },
-            "image/webp",
-            quality
-          );
-        });
-
-      let quality = INITIAL_WEBP_QUALITY;
-      let blob = await canvasToWebP(quality);
-
-      while (
-        blob.size > MAX_COMPRESSED_IMAGE_BYTES &&
-        quality > MIN_WEBP_QUALITY
-      ) {
-        quality = Math.max(MIN_WEBP_QUALITY, quality - WEBP_QUALITY_STEP);
-
-        blob = await canvasToWebP(quality);
-      }
-
-      if (blob.size > MAX_COMPRESSED_IMAGE_BYTES) {
-        throw new Error(
-          `Image "${file.name}" could not be compressed below 3.5 MB.`
-        );
-      }
-
-      const baseName = file.name.replace(/\.[^/.]+$/, "");
-
-      return new File([blob], `${baseName}.webp`, {
-        type: "image/webp",
-        lastModified: Date.now(),
-      });
+      throw new Error(
+        `Unable to compress "${file.name}" to the required size.`
+      );
     } finally {
       URL.revokeObjectURL(objectUrl);
     }
@@ -984,7 +1034,7 @@ export function CarForm({
           {bool("originalRcAvailable", "Original RC available")}
         </div>
 
-        <div className="mt-4">
+        {/* <div className="mt-4">
           <Field label="RC notes">
             <Textarea
               rows={3}
@@ -993,7 +1043,7 @@ export function CarForm({
               placeholder="Any transfer/document notes..."
             />
           </Field>
-        </div>
+        </div> */}
 
         <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div className="lg:col-span-3">
@@ -1014,10 +1064,28 @@ export function CarForm({
           </Field>
 
           <Field label="Insurance company">
-            <Input
+            {/* <Input
               value={form.insuranceCompany}
               onChange={(event) => set("insuranceCompany", event.target.value)}
-            />
+            /> */}
+            <Select
+              value={form.insuranceCompany ?? ""}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  insuranceCompany: e.target.value,
+                }))
+              }
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+            >
+              <option value="">Select insurance company</option>
+
+              {INSURANCE_COMPANIES.map((company) => (
+                <option key={company} value={company}>
+                  {company}
+                </option>
+              ))}
+            </Select>
           </Field>
 
           <Field label="Insurance valid until">
@@ -1030,14 +1098,14 @@ export function CarForm({
             />
           </Field>
 
-          <Field label="Policy number">
+          {/* <Field label="Policy number">
             <Input
               value={form.insurancePolicyNumber}
               onChange={(event) =>
                 set("insurancePolicyNumber", event.target.value)
               }
             />
-          </Field>
+          </Field> */}
 
           <div>{bool("pucAvailable", "PUC available")}</div>
 

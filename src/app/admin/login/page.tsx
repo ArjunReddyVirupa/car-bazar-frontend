@@ -2,7 +2,14 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { CarFront, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
+import {
+  CarFront,
+  LockKeyhole,
+  Mail,
+  // ShieldCheck,
+  Eye,
+  EyeOff,
+} from "lucide-react";
 import { useStore } from "@/src/store/useStore";
 import { Button } from "@/src/components/ui/Button";
 import { Input } from "@/src/components/ui/Input";
@@ -13,6 +20,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   useEffect(() => {
     if (!useStore.getState().authChecked) void hydrateAuth();
   }, [hydrateAuth]);
@@ -66,14 +74,27 @@ export default function Login() {
             <span className="flex items-center gap-2">
               <LockKeyhole size={15} /> Password
             </span>
-            <Input
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-            />
+            <div className="relative">
+              <Input
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="pr-11"
+              />
+
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-700"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                title={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </label>
           {error && (
             <p className="rounded-xl bg-red-50 p-3 text-sm font-bold text-red-700">
@@ -84,11 +105,11 @@ export default function Login() {
             {busy ? "Signing in…" : "Sign in"}
           </Button>
         </form>
-        <div className="mt-6 flex items-start gap-2 rounded-2xl bg-emerald-50 p-4 text-xs font-semibold leading-5 text-emerald-800">
+        {/* <div className="mt-6 flex items-start gap-2 rounded-2xl bg-emerald-50 p-4 text-xs font-semibold leading-5 text-emerald-800">
           <ShieldCheck size={17} className="mt-0.5 shrink-0" /> Authentication
           is handled by the backend using an HttpOnly cookie. The browser never
           stores your JWT.
-        </div>
+        </div> */}
         <Link
           href="/"
           className="mt-6 block text-center text-sm font-bold text-slate-500 hover:text-orange-600"
