@@ -11,7 +11,6 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { ImagePlus, Save, Upload, X, Loader2, AlertCircle } from "lucide-react";
-
 import { useStore } from "@/src/store/useStore";
 import { Button } from "@/src/components/ui/Button";
 import { Field, Input, Select, Textarea } from "@/src/components/ui/Input";
@@ -328,7 +327,7 @@ export function CarForm({
         URL.revokeObjectURL(photo.url);
       });
     };
-  }, [photos]);
+  }, []);
 
   /**
    * Validate and add files.
@@ -518,83 +517,91 @@ export function CarForm({
   };
 
   async function compressImageForUpload(file: File): Promise<File> {
+    const objectUrl = URL.createObjectURL(file);
+
     try {
-      const bitmap = await createImageBitmap(file);
+      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new Image();
 
-      try {
-        const scale = Math.min(
-          1,
-          MAX_IMAGE_WIDTH / bitmap.width,
-          MAX_IMAGE_HEIGHT / bitmap.height
-        );
+        img.onload = () => resolve(img);
 
-        const width = Math.max(1, Math.round(bitmap.width * scale));
-        const height = Math.max(1, Math.round(bitmap.height * scale));
+        img.onerror = () => {
+          reject(new Error(`Unable to decode image "${file.name}".`));
+        };
 
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-
-        const context = canvas.getContext("2d");
-
-        if (!context) {
-          throw new Error("Unable to prepare image for upload.");
-        }
-
-        context.drawImage(bitmap, 0, 0, width, height);
-
-        const canvasToWebP = (quality: number): Promise<Blob> =>
-          new Promise((resolve, reject) => {
-            canvas.toBlob(
-              (blob) => {
-                if (!blob) {
-                  reject(new Error("Unable to compress image."));
-                  return;
-                }
-
-                resolve(blob);
-              },
-              "image/webp",
-              quality
-            );
-          });
-
-        let quality = INITIAL_WEBP_QUALITY;
-        let blob = await canvasToWebP(quality);
-
-        while (
-          blob.size > MAX_COMPRESSED_IMAGE_BYTES &&
-          quality > MIN_WEBP_QUALITY
-        ) {
-          quality = Math.max(MIN_WEBP_QUALITY, quality - WEBP_QUALITY_STEP);
-
-          blob = await canvasToWebP(quality);
-        }
-
-        if (blob.size > MAX_COMPRESSED_IMAGE_BYTES) {
-          throw new Error(
-            `Image "${file.name}" could not be compressed below 3.5 MB.`
-          );
-        }
-
-        const baseName = file.name.replace(/\.[^/.]+$/, "");
-
-        return new File([blob], `${baseName}.webp`, {
-          type: "image/webp",
-          lastModified: Date.now(),
-        });
-      } finally {
-        bitmap.close();
-      }
-    } catch (error) {
-      console.error("IMAGE PREPARATION FAILED:", {
-        name: file.name,
-        type: file.type,
-        size: file.size,
-        error,
+        img.src = objectUrl;
       });
 
-      throw new Error(`Unable to prepare image for upload: ${file.name}`);
+      const originalWidth = image.naturalWidth;
+      const originalHeight = image.naturalHeight;
+
+      if (!originalWidth || !originalHeight) {
+        throw new Error(`Invalid image dimensions for "${file.name}".`);
+      }
+
+      const scale = Math.min(
+        1,
+        MAX_IMAGE_WIDTH / originalWidth,
+        MAX_IMAGE_HEIGHT / originalHeight
+      );
+
+      const width = Math.max(1, Math.round(originalWidth * scale));
+      const height = Math.max(1, Math.round(originalHeight * scale));
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+
+      const context = canvas.getContext("2d");
+
+      if (!context) {
+        throw new Error("Unable to create image canvas.");
+      }
+
+      context.drawImage(image, 0, 0, width, height);
+
+      const canvasToWebP = (quality: number): Promise<Blob> =>
+        new Promise((resolve, reject) => {
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) {
+                reject(new Error("Unable to create WebP image."));
+                return;
+              }
+
+              resolve(blob);
+            },
+            "image/webp",
+            quality
+          );
+        });
+
+      let quality = INITIAL_WEBP_QUALITY;
+      let blob = await canvasToWebP(quality);
+
+      while (
+        blob.size > MAX_COMPRESSED_IMAGE_BYTES &&
+        quality > MIN_WEBP_QUALITY
+      ) {
+        quality = Math.max(MIN_WEBP_QUALITY, quality - WEBP_QUALITY_STEP);
+
+        blob = await canvasToWebP(quality);
+      }
+
+      if (blob.size > MAX_COMPRESSED_IMAGE_BYTES) {
+        throw new Error(
+          `Image "${file.name}" could not be compressed below 3.5 MB.`
+        );
+      }
+
+      const baseName = file.name.replace(/\.[^/.]+$/, "");
+
+      return new File([blob], `${baseName}.webp`, {
+        type: "image/webp",
+        lastModified: Date.now(),
+      });
+    } finally {
+      URL.revokeObjectURL(objectUrl);
     }
   }
 
